@@ -205,6 +205,4 @@ Recommended manual checks:
 This hasn't been run in this environment (no network access to install
 Django here), so run `python manage.py check` right after installing to
 catch anything environment-specific before you rely on it.
-#   w a r e h o u s e - m a n a g e r 
- 
- 
+#
