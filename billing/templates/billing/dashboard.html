@@ -1,0 +1,67 @@
+{% extends 'billing/base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Dashboard</h1><p>{{ biz_settings.business_name }} — today at a glance</p></div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="label">Stock value</div><div class="value">{{ biz_settings.currency }}{{ stock_value|floatformat:2 }}</div></div>
+  <div class="stat"><div class="label">Items tracked</div><div class="value">{{ item_count }}</div></div>
+  <div class="stat"><div class="label">Low on stock</div><div class="value {% if low_stock_count %}stamp{% else %}good{% endif %}">{{ low_stock_count }}</div></div>
+  <div class="stat"><div class="label">Billed today</div><div class="value good">{{ biz_settings.currency }}{{ today_total|floatformat:2 }}</div></div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="label">Receivable (customers owe you)</div><div class="value {% if receivable > 0 %}stamp{% else %}good{% endif %}">{{ biz_settings.currency }}{{ receivable|floatformat:2 }}</div></div>
+  <div class="stat"><div class="label">Payable (you owe suppliers)</div><div class="value {% if payable > 0 %}stamp{% else %}good{% endif %}">{{ biz_settings.currency }}{{ payable|floatformat:2 }}</div></div>
+</div>
+
+<div class="section">
+  <div class="section-head">
+    <h2>Needs reordering</h2>
+    {% if low_stock %}<a class="btn ghost small" href="{% url 'inventory_list' %}">View inventory</a>{% endif %}
+  </div>
+  <div class="section-body">
+    {% if low_stock %}
+    <table>
+      <thead><tr><th>Item</th><th>SKU</th><th class="num">In stock</th><th class="num">Reorder at</th></tr></thead>
+      <tbody>
+        {% for p in low_stock %}
+        <tr><td>{{ p.name }}</td><td class="mono">{{ p.sku }}</td><td class="num">{{ p.quantity|floatformat:3 }} {{ p.unit }}</td><td class="num">{{ p.reorder_level|floatformat:3 }} {{ p.unit }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><h3>All stocked up</h3><p>Nothing has crossed its reorder level.</p></div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-head">
+    <h2>Recent bills</h2>
+    {% if recent_invoices %}<a class="btn ghost small" href="{% url 'invoice_list' %}">View all</a>{% endif %}
+  </div>
+  <div class="section-body">
+    {% if recent_invoices %}
+    <table>
+      <thead><tr><th>Bill no.</th><th>Customer</th><th>Date</th><th class="num">Total</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for inv in recent_invoices %}
+        <tr>
+          <td class="mono"><a href="{% url 'invoice_detail' inv.pk %}">{{ inv.number }}</a></td>
+          <td>{{ inv.customer_name|default:"Walk-in" }}</td>
+          <td>{{ inv.date|date:"M j, Y" }}</td>
+          <td class="num">{{ biz_settings.currency }}{{ inv.total|floatformat:2 }}</td>
+          <td><span class="tag {% if inv.status == 'Paid' %}paid{% else %}draft{% endif %}">{{ inv.status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><h3>No bills yet</h3><p>Create your first bill to see it here.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

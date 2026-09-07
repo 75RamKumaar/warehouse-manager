@@ -1,0 +1,222 @@
+{% extends 'billing/base.html' %}
+{% block title %}New bill{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>New bill</h1><p>Add items and generate an invoice — stock and GST are worked out automatically</p></div>
+</div>
+
+<form method="post" id="bill-form">
+  {% csrf_token %}
+  <input type="hidden" name="customer_id" id="hidden-customer-id">
+  <input type="hidden" name="discount" id="hidden-discount" value="0">
+  <input type="hidden" name="items_json" id="hidden-items-json" value="[]">
+
+  <div class="bill-grid">
+    <div>
+      <div class="section">
+        <div class="section-head"><h2>Customer</h2></div>
+        <div class="section-body" style="padding-top:14px;">
+          <select id="bill-customer">
+            <option value="" data-state="">Walk-in customer</option>
+            {% for c in customers %}
+              <option value="{{ c.pk }}" data-state="{{ c.state|escapejs }}">{{ c.name }}{% if c.state %} ({{ c.state }}){% endif %}</option>
+            {% endfor %}
+          </select>
+          <div id="gst-note" style="font-size:12px;color:var(--ink-soft);margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><h2>Add item</h2></div>
+        <div class="section-body" style="padding-top:14px;">
+          <div class="line-add">
+            <div>
+              <label>Item</label>
+              <select id="line-product">
+                <option value="">Select item…</option>
+                {% for p in all_products %}
+                  <option value="{{ p.pk }}"
+                    data-price="{{ p.selling_price }}"
+                    data-stock="{{ p.quantity }}"
+                    data-name="{{ p.name }}"
+                    data-unit="{{ p.unit }}"
+                    data-gst="{{ p.gst_rate }}"
+                    {% if p.quantity <= 0 %}disabled{% endif %}>
+                    {{ p.name }} — {{ p.quantity }}{{ p.unit }} in stock{% if p.quantity <= 0 %} (out){% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div><label>Qty</label><input type="number" id="line-qty" min="0.001" step="0.001" value="1"></div>
+            <div><label>Price/unit</label><input type="number" id="line-price" step="0.01" min="0"></div>
+            <button class="btn small" type="button" id="add-line">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><h2>Items on this bill</h2></div>
+        <div class="section-body">
+          <table>
+            <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">GST</th><th class="num">Line total</th><th></th></tr></thead>
+            <tbody id="line-items-body">
+              <tr class="empty-row" id="empty-row"><td colspan="6">No items added yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section">
+        <div class="section-head"><h2>Bill summary</h2></div>
+        <div class="section-body" style="padding-top:14px;">
+          <div class="totals-box">
+            <div class="totals-row"><span>Subtotal</span><span class="mono" id="sum-subtotal">{{ currency }}0.00</span></div>
+            <div class="totals-row"><span>Discount</span><input type="number" id="ui-discount" min="0" step="0.01" value="0"></div>
+            <div class="totals-row" id="row-cgst"><span>CGST</span><span class="mono" id="sum-cgst">{{ currency }}0.00</span></div>
+            <div class="totals-row" id="row-sgst"><span>SGST</span><span class="mono" id="sum-sgst">{{ currency }}0.00</span></div>
+            <div class="totals-row" id="row-igst" style="display:none;"><span>IGST</span><span class="mono" id="sum-igst">{{ currency }}0.00</span></div>
+            <div class="totals-row grand"><span>Total</span><span class="mono" id="sum-total">{{ currency }}0.00</span></div>
+          </div>
+          <div class="field" style="margin-top:14px;">
+            <label style="display:flex;align-items:center;gap:8px;font-weight:500;">
+              <input type="checkbox" id="mark-paid" name="mark_paid" style="width:auto;"> Paid in full now
+            </label>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn" type="submit" id="finalize-bill" disabled>Generate bill</button>
+            <button class="btn ghost" type="button" id="clear-bill" disabled>Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script id="business-state-data" type="application/json">{{ business_state|default:""|escapejs }}</script>
+<script>
+(function(){
+  const currency = "{{ currency|escapejs }}";
+  const businessState = document.getElementById('business-state-data').textContent.trim();
+  let items = [];
+
+  const customerSelect = document.getElementById('bill-customer');
+  const productSelect = document.getElementById('line-product');
+  const qtyInput = document.getElementById('line-qty');
+  const priceInput = document.getElementById('line-price');
+  const addBtn = document.getElementById('add-line');
+  const body = document.getElementById('line-items-body');
+  const emptyRow = document.getElementById('empty-row');
+  const discountInput = document.getElementById('ui-discount');
+  const finalizeBtn = document.getElementById('finalize-bill');
+  const clearBtn = document.getElementById('clear-bill');
+  const gstNote = document.getElementById('gst-note');
+
+  function money(n){
+    return currency + (Math.round(n * 100) / 100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function isInterstate(){
+    const opt = customerSelect.options[customerSelect.selectedIndex];
+    const custState = (opt.dataset.state || '').trim();
+    return !!(businessState && custState && businessState.toLowerCase() !== custState.toLowerCase());
+  }
+
+  function updateGstNote(){
+    const interstate = isInterstate();
+    document.getElementById('row-cgst').style.display = interstate ? 'none' : 'flex';
+    document.getElementById('row-sgst').style.display = interstate ? 'none' : 'flex';
+    document.getElementById('row-igst').style.display = interstate ? 'flex' : 'none';
+    gstNote.textContent = interstate ? 'Interstate sale — IGST applies.' :
+      (businessState ? 'Same-state sale — CGST + SGST applies.' : 'Set your business state in Settings for automatic GST split.');
+  }
+
+  customerSelect.addEventListener('change', () => { updateGstNote(); renderItems(); });
+
+  productSelect.addEventListener('change', () => {
+    const opt = productSelect.options[productSelect.selectedIndex];
+    priceInput.value = opt.dataset.price || '';
+  });
+
+  addBtn.addEventListener('click', () => {
+    const opt = productSelect.options[productSelect.selectedIndex];
+    const productId = productSelect.value;
+    const qty = parseFloat(qtyInput.value) || 0;
+    const price = parseFloat(priceInput.value) || 0;
+    if(!productId){ alert('Choose an item first'); return; }
+    if(qty <= 0){ alert('Quantity must be greater than zero'); return; }
+    const stock = parseFloat(opt.dataset.stock) || 0;
+    const alreadyInBill = items.filter(it => it.product_id === productId).reduce((s,it)=>s+it.qty,0);
+    if(alreadyInBill + qty > stock){ alert('Only ' + (stock - alreadyInBill) + ' ' + opt.dataset.unit + ' left in stock'); return; }
+    items.push({
+      product_id: productId, name: opt.dataset.name, unit: opt.dataset.unit,
+      gst_rate: parseFloat(opt.dataset.gst) || 0, qty, price
+    });
+    renderItems();
+  });
+
+  body.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-remove]');
+    if(!btn) return;
+    items.splice(parseInt(btn.dataset.remove, 10), 1);
+    renderItems();
+  });
+
+  discountInput.addEventListener('input', renderItems);
+
+  clearBtn.addEventListener('click', () => {
+    items = [];
+    discountInput.value = 0;
+    renderItems();
+  });
+
+  function renderItems(){
+    body.innerHTML = '';
+    if(!items.length){
+      body.appendChild(emptyRow);
+    } else {
+      items.forEach((it, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${it.name}</td>
+          <td class="num">${it.qty} ${it.unit}</td>
+          <td class="num">${money(it.price)}</td>
+          <td class="num">${it.gst_rate}%</td>
+          <td class="num">${money(it.qty * it.price)}</td>
+          <td style="text-align:right;"><button class="icon-btn del" type="button" data-remove="${idx}">Remove</button></td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    const subtotal = items.reduce((s, it) => s + it.qty * it.price, 0);
+    const discount = parseFloat(discountInput.value) || 0;
+    const totalTax = items.reduce((s, it) => s + (it.qty * it.price * it.gst_rate / 100), 0);
+    const interstate = isInterstate();
+    let cgst = 0, sgst = 0, igst = 0;
+    if(interstate){ igst = totalTax; } else { cgst = totalTax / 2; sgst = totalTax / 2; }
+    const total = Math.max(0, subtotal - discount + totalTax);
+
+    document.getElementById('sum-subtotal').textContent = money(subtotal);
+    document.getElementById('sum-cgst').textContent = money(cgst);
+    document.getElementById('sum-sgst').textContent = money(sgst);
+    document.getElementById('sum-igst').textContent = money(igst);
+    document.getElementById('sum-total').textContent = money(total);
+
+    finalizeBtn.disabled = items.length === 0;
+    clearBtn.disabled = items.length === 0;
+  }
+
+  document.getElementById('bill-form').addEventListener('submit', (e) => {
+    if(!items.length){ e.preventDefault(); return; }
+    document.getElementById('hidden-customer-id').value = customerSelect.value;
+    document.getElementById('hidden-discount').value = discountInput.value || 0;
+    document.getElementById('hidden-items-json').value = JSON.stringify(items);
+  });
+
+  updateGstNote();
+  renderItems();
+})();
+</script>
+{% endblock %}

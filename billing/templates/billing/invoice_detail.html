@@ -1,0 +1,110 @@
+{% extends 'billing/base.html' %}
+{% block title %}Bill {{ invoice.number }}{% endblock %}
+{% block content %}
+{% firstof invoice.profile_currency biz_settings.currency as invoice_currency %}
+<div class="page-head no-print">
+  <div><h1>Bill {{ invoice.number }}</h1><p>{{ invoice.date|date:"M j, Y, g:i A" }}</p></div>
+  <div class="head-actions">
+    <a class="btn ghost" href="{% url 'invoice_list' %}">Back to invoices</a>
+    <button class="btn" onclick="window.print()">Print</button>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-body" style="padding-top:18px;">
+    <div class="inv-paper-head">
+      <div>
+        {% if invoice.profile_logo %}<img class="profile-logo" src="/media/{{ invoice.profile_logo }}" alt="Business logo">{% endif %}
+        <h2>{% firstof invoice.profile_name biz_settings.business_name %}</h2>
+        {% if invoice.profile_address %}<div class="inv-meta">{{ invoice.profile_address }}{% if invoice.profile_city %}, {{ invoice.profile_city }}{% endif %}{% if invoice.profile_pincode %} - {{ invoice.profile_pincode }}{% endif %}</div>{% endif %}
+        {% if invoice.profile_phone or invoice.profile_email %}<div class="inv-meta">{{ invoice.profile_phone }}{% if invoice.profile_phone and invoice.profile_email %} · {% endif %}{{ invoice.profile_email }}</div>{% endif %}
+        <div class="inv-meta">Bill {{ invoice.number }}{% if invoice.is_interstate %} · Interstate{% endif %}</div>
+        {% firstof invoice.profile_gstin biz_settings.gstin as invoice_gstin %}{% if invoice_gstin %}<div class="inv-meta">GSTIN {{ invoice_gstin }}</div>{% endif %}
+      </div>
+      <div style="text-align:right;">
+        <div class="inv-meta">{{ invoice.date|date:"M j, Y, g:i A" }}</div>
+        <div class="inv-meta">{{ invoice.customer_name|default:"Walk-in customer" }}</div>
+        {% if invoice.customer_gstin %}<div class="inv-meta">GSTIN {{ invoice.customer_gstin }}</div>{% endif %}
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Price</th><th class="num">GST</th><th class="num">Total</th></tr></thead>
+      <tbody>
+        {% for item in invoice.items.all %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td class="mono">{{ item.hsn_code|default:"—" }}</td>
+          <td class="num">{{ item.quantity|floatformat:3 }} {{ item.unit }}</td>
+          <td class="num">{{ invoice_currency }}{{ item.price|floatformat:2 }}</td>
+          <td class="num">{{ item.gst_rate|floatformat:2 }}%</td>
+          <td class="num">{{ invoice_currency }}{{ item.line_total|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="totals-box" style="margin-top:16px;max-width:320px;margin-left:auto;">
+      <div class="totals-row"><span>Subtotal</span><span class="mono">{{ invoice_currency }}{{ invoice.subtotal|floatformat:2 }}</span></div>
+      <div class="totals-row"><span>Discount</span><span class="mono">−{{ invoice_currency }}{{ invoice.discount|floatformat:2 }}</span></div>
+      {% if invoice.is_interstate %}
+      <div class="totals-row"><span>IGST</span><span class="mono">{{ invoice_currency }}{{ invoice.igst|floatformat:2 }}</span></div>
+      {% else %}
+      <div class="totals-row"><span>CGST</span><span class="mono">{{ invoice_currency }}{{ invoice.cgst|floatformat:2 }}</span></div>
+      <div class="totals-row"><span>SGST</span><span class="mono">{{ invoice_currency }}{{ invoice.sgst|floatformat:2 }}</span></div>
+      {% endif %}
+      <div class="totals-row grand"><span>Total</span><span class="mono">{{ invoice_currency }}{{ invoice.total|floatformat:2 }}</span></div>
+    </div>
+
+    <div class="no-print" style="margin-top:18px;">
+      <span class="tag {% if invoice.status == 'Paid' %}paid{% elif invoice.status == 'Partially Paid' %}partial{% else %}draft{% endif %}">{{ invoice.status }}</span>
+    </div>
+
+    <div class="invoice-payment-grid no-print">
+      <div class="payment-panel">
+        <div class="section-head"><h2>Invoice Summary</h2></div>
+        <div class="section-body">
+          <div class="payment-stat"><span>Bill Amount</span><strong>{{ invoice_currency }}{{ invoice.total_amount|floatformat:2 }}</strong></div>
+          <div class="payment-stat"><span>Amount Paid</span><strong class="paid-amount">{{ invoice_currency }}{{ invoice.total_paid|floatformat:2 }}</strong></div>
+          <div class="payment-stat balance"><span>Balance Due</span><strong>{{ invoice_currency }}{{ invoice.balance_due|floatformat:2 }}</strong></div>
+          <div class="payment-stat"><span>Status</span><strong>{{ invoice.status }}</strong></div>
+        </div>
+      </div>
+      <div class="payment-panel payment-form-panel">
+        <div class="section-head"><h2>Make Payment</h2></div>
+        <div class="section-body">
+          <div class="payment-meta"><span>Bill Amount</span><strong>{{ invoice_currency }}{{ invoice.total_amount|floatformat:2 }}</strong><span>Already Paid</span><strong>{{ invoice_currency }}{{ invoice.total_paid|floatformat:2 }}</strong><span>Amount Remaining</span><strong class="remaining">{{ invoice_currency }}{{ invoice.balance_due|floatformat:2 }}</strong></div>
+          {% if invoice.balance_due > 0 %}
+          <form method="post" action="{% url 'invoice_payment' invoice.pk %}">
+            {% csrf_token %}
+            {{ payment_form.invoice }}
+            <div class="field"><label for="{{ payment_form.amount.id_for_label }}">Payment amount</label>{{ payment_form.amount }}{{ payment_form.amount.errors }}</div>
+            <div class="field"><label for="{{ payment_form.mode.id_for_label }}">Payment method</label>{{ payment_form.mode }}</div>
+            <div class="field"><label for="{{ payment_form.note.id_for_label }}">Reference</label>{{ payment_form.note }}</div>
+            <button class="btn" type="submit">Record payment</button>
+          </form>
+          {% else %}<p class="paid-message">This bill is fully paid.</p>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="section payment-history no-print">
+      <div class="section-head"><h2>Payment History</h2></div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th>Date</th><th class="num">Payment</th><th>Payment Method</th><th>Reference</th></tr></thead>
+          <tbody>
+            {% for receipt in invoice.receipts.all %}
+            <tr><td>{{ receipt.date|date:"d-M-Y" }}</td><td class="num">{{ invoice_currency }}{{ receipt.amount|floatformat:2 }}</td><td>{{ receipt.get_mode_display }}</td><td>{{ receipt.note|default:"—" }}</td></tr>
+            {% empty %}<tr class="empty-row"><td colspan="4">No payments recorded.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+        <div class="totals-box" style="margin-top:16px;max-width:320px;margin-left:auto;">
+          <div class="totals-row"><span>Total Paid</span><strong>{{ invoice_currency }}{{ invoice.total_paid|floatformat:2 }}</strong></div>
+          <div class="totals-row"><span>Balance Due</span><strong>{{ invoice_currency }}{{ invoice.balance_due|floatformat:2 }}</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

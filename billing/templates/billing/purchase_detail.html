@@ -1,0 +1,59 @@
+{% extends 'billing/base.html' %}
+{% block title %}Purchase {{ purchase.number }}{% endblock %}
+{% block content %}
+{% firstof purchase.profile_currency biz_settings.currency as purchase_currency %}
+<div class="page-head no-print">
+  <div><h1>Purchase {{ purchase.number }}</h1><p>{{ purchase.date|date:"M j, Y, g:i A" }}</p></div>
+  <div class="head-actions">
+    <a class="btn ghost" href="{% url 'purchase_list' %}">Back to purchases</a>
+    <button class="btn" onclick="window.print()">Print</button>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-body" style="padding-top:18px;">
+    <div class="inv-paper-head">
+      <div>{% if purchase.profile_logo %}<img class="profile-logo" src="/media/{{ purchase.profile_logo }}" alt="Business logo">{% endif %}<h2>{% firstof purchase.profile_name biz_settings.business_name %}</h2>{% if purchase.profile_address %}<div class="inv-meta">{{ purchase.profile_address }}{% if purchase.profile_city %}, {{ purchase.profile_city }}{% endif %}{% if purchase.profile_pincode %} - {{ purchase.profile_pincode }}{% endif %}</div>{% endif %}<div class="inv-meta">Purchase {{ purchase.number }}{% if purchase.is_interstate %} · Interstate{% endif %}</div>{% firstof purchase.profile_gstin biz_settings.gstin as purchase_gstin %}{% if purchase_gstin %}<div class="inv-meta">GSTIN {{ purchase_gstin }}</div>{% endif %}</div>
+      <div style="text-align:right;">
+        <div class="inv-meta">{{ purchase.date|date:"M j, Y, g:i A" }}</div>
+        <div class="inv-meta">{{ purchase.supplier_name|default:"—" }}{% if purchase.supplier_gstin %} · GSTIN {{ purchase.supplier_gstin }}{% endif %}</div>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Cost</th><th class="num">GST</th><th class="num">Total</th></tr></thead>
+      <tbody>
+        {% for item in purchase.items.all %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td class="mono">{{ item.hsn_code|default:"—" }}</td>
+          <td class="num">{{ item.quantity|floatformat:3 }} {{ item.unit }}</td>
+          <td class="num">{{ purchase_currency }}{{ item.price|floatformat:2 }}</td>
+          <td class="num">{{ item.gst_rate|floatformat:2 }}%</td>
+          <td class="num">{{ purchase_currency }}{{ item.line_total|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="totals-box" style="margin-top:16px;max-width:320px;margin-left:auto;">
+      <div class="totals-row"><span>Subtotal</span><span class="mono">{{ biz_settings.currency }}{{ purchase.subtotal|floatformat:2 }}</span></div>
+      <div class="totals-row"><span>Discount</span><span class="mono">−{{ biz_settings.currency }}{{ purchase.discount|floatformat:2 }}</span></div>
+      {% if purchase.is_interstate %}
+      <div class="totals-row"><span>IGST</span><span class="mono">{{ biz_settings.currency }}{{ purchase.igst|floatformat:2 }}</span></div>
+      {% else %}
+      <div class="totals-row"><span>CGST</span><span class="mono">{{ biz_settings.currency }}{{ purchase.cgst|floatformat:2 }}</span></div>
+      <div class="totals-row"><span>SGST</span><span class="mono">{{ biz_settings.currency }}{{ purchase.sgst|floatformat:2 }}</span></div>
+      {% endif %}
+      <div class="totals-row grand"><span>Total</span><span class="mono">{{ biz_settings.currency }}{{ purchase.total|floatformat:2 }}</span></div>
+    </div>
+
+    <div class="no-print" style="margin-top:18px;">
+      <span class="tag {% if purchase.status == 'Paid' %}paid{% else %}draft{% endif %}">{{ purchase.status }}</span>
+      {% if purchase.amount_paid > 0 and purchase.status != 'Paid' %}
+      <span style="font-size:12.5px;color:var(--ink-soft);margin-left:8px;">{{ biz_settings.currency }}{{ purchase.amount_paid|floatformat:2 }} paid so far</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

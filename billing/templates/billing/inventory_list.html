@@ -1,0 +1,48 @@
+{% extends 'billing/base.html' %}
+{% block title %}Inventory{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Inventory</h1><p>{{ products.count }} item{{ products.count|pluralize }} tracked · stock value {{ biz_settings.currency }}{{ stock_value|floatformat:2 }}</p></div>
+  <div class="head-actions"><a class="btn" href="{% url 'product_create' %}">+ Add item</a></div>
+</div>
+
+<div class="toolbar">
+  <form method="get" style="display:flex;gap:8px;">
+    <input class="search" type="text" name="q" placeholder="Search by name or SKU…" value="{{ q }}">
+    <button class="btn ghost small" type="submit">Search</button>
+  </form>
+</div>
+
+<div class="section">
+  <div class="section-body">
+    <table>
+      <thead>
+        <tr><th>Item</th><th>SKU</th><th>HSN</th><th class="num">GST</th><th class="num">Cost</th><th class="num">Price</th><th class="num">Qty</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr>
+          <td>{{ p.name }}</td>
+          <td class="mono">{{ p.sku }}</td>
+          <td class="mono">{{ p.hsn_code|default:"—" }}</td>
+          <td class="num">{{ p.gst_rate|floatformat:2 }}%</td>
+          <td class="num">{{ biz_settings.currency }}{{ p.cost_price|floatformat:2 }}/{{ p.unit }}</td>
+          <td class="num">{{ biz_settings.currency }}{{ p.selling_price|floatformat:2 }}/{{ p.unit }}</td>
+          <td class="num">{{ p.quantity|floatformat:3 }} {{ p.unit }}</td>
+          <td>{% if p.is_low_stock %}<span class="tag low">Low stock</span>{% else %}<span class="tag ok">In stock</span>{% endif %}</td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a class="icon-btn" href="{% url 'product_update' p.pk %}">Edit</a>
+            <form method="post" action="{% url 'product_delete' p.pk %}" style="display:inline;" onsubmit="return confirm('Delete this item from inventory?');">
+              {% csrf_token %}
+              <button class="icon-btn del" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="9">No items match. Try a different search, or add your first item.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

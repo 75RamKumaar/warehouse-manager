@@ -1,0 +1,153 @@
+{% extends 'billing/base.html' %}
+{% block title %}Invoices{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Invoices</h1><p>{% if search %}{{ invoices.count }} result{{ invoices.count|pluralize }} for “{{ search }}”{% else %}{{ invoices.count }} generated so far{% endif %}</p></div>
+</div>
+
+<div class="section">
+  <div class="section-body">
+    <form class="invoice-search" method="get" role="search" autocomplete="off">
+      <label class="sr-only" for="invoice-search-input">Search invoices by customer name</label>
+      <span class="search-icon" aria-hidden="true">⌕</span>
+      <input id="invoice-search-input" class="search" type="search" name="search" placeholder="Search customer name..." value="{{ search }}">
+      <button class="btn ghost small" type="submit">Search</button>
+      {% if search %}<a class="btn ghost small" href="{% url 'invoice_list' %}">Clear</a>{% endif %}
+      <div id="invoice-suggestions" class="suggestions" role="listbox" aria-label="Customer suggestions" hidden></div>
+    </form>
+    {% if search %}<p class="search-result-note">Showing invoices for customer names containing <strong>{{ search }}</strong>.</p>{% endif %}
+    <table>
+      <thead><tr><th>Bill no.</th><th>Customer</th><th>Date</th><th class="num">Items</th><th class="num">Total</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr>
+          <td class="mono"><a href="{% url 'invoice_detail' inv.pk %}">{{ inv.number }}</a></td>
+          <td>{{ inv.customer_name|default:"Walk-in" }}</td>
+          <td>{{ inv.date|date:"M j, Y" }}</td>
+          <td class="num">{{ inv.items.count }}</td>
+          <td class="num">{{ biz_settings.currency }}{{ inv.total|floatformat:2 }}</td>
+          <td><span class="tag {% if inv.status == 'Paid' %}paid{% else %}draft{% endif %}">{{ inv.status }}</span></td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a class="icon-btn" href="{% url 'invoice_detail' inv.pk %}">View</a>
+            {% if inv.status != 'Paid' %}
+            <form method="post" action="{% url 'invoice_mark_paid' inv.pk %}" style="display:inline;">
+              {% csrf_token %}
+              <button class="icon-btn" type="submit">Mark paid</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="7">{% if search %}No invoices match “{{ search }}”.{% else %}No invoices yet. Create one from New bill.{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function () {
+  const form = document.querySelector('.invoice-search');
+  const input = document.getElementById('invoice-search-input');
+  const suggestions = document.getElementById('invoice-suggestions');
+  const endpoint = "{% url 'invoice_customer_suggestions' %}";
+  let items = [];
+  let activeIndex = -1;
+  let timer;
+  let requestId = 0;
+
+  function closeSuggestions() {
+    items = [];
+    activeIndex = -1;
+    suggestions.innerHTML = '';
+    suggestions.hidden = true;
+    input.removeAttribute('aria-activedescendant');
+  }
+
+  function highlight(name, query) {
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return name.replace(new RegExp('(' + escaped + ')', 'ig'), '<strong>$1</strong>');
+  }
+
+  function render(query, names) {
+    items = names;
+    activeIndex = -1;
+    suggestions.innerHTML = '';
+    if (!names.length) {
+      suggestions.innerHTML = '<div class="suggestion-empty">No customers found</div>';
+      suggestions.hidden = false;
+      return;
+    }
+    names.forEach(function (customer, index) {
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'suggestion-option';
+      option.id = 'customer-suggestion-' + customer.id;
+      option.setAttribute('role', 'option');
+      option.innerHTML = highlight(customer.name, query);
+      option.addEventListener('mousedown', function (event) {
+        event.preventDefault();
+        selectSuggestion(index);
+      });
+      suggestions.appendChild(option);
+    });
+    suggestions.hidden = false;
+  }
+
+  function selectSuggestion(index) {
+    if (!items[index]) return;
+    input.value = items[index].name;
+    closeSuggestions();
+    form.submit();
+  }
+
+  function setActive(index) {
+    const options = suggestions.querySelectorAll('.suggestion-option');
+    options.forEach(function (option, optionIndex) {
+      option.classList.toggle('active', optionIndex === index);
+    });
+    activeIndex = index;
+    if (items[index]) input.setAttribute('aria-activedescendant', 'customer-suggestion-' + items[index].id);
+  }
+
+  input.addEventListener('input', function () {
+    const query = input.value.trim();
+    clearTimeout(timer);
+    if (query.length < 2) {
+      closeSuggestions();
+      return;
+    }
+    timer = setTimeout(function () {
+      const currentRequest = ++requestId;
+      fetch(endpoint + '?q=' + encodeURIComponent(query), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (response) { return response.ok ? response.json() : []; })
+        .then(function (data) {
+          if (currentRequest === requestId && input.value.trim() === query) render(query, data);
+        })
+        .catch(function () {
+          if (currentRequest === requestId) closeSuggestions();
+        });
+    }, 180);
+  });
+
+  input.addEventListener('keydown', function (event) {
+    if (suggestions.hidden) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActive(items.length ? (activeIndex + 1) % items.length : -1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActive(items.length ? (activeIndex - 1 + items.length) % items.length : -1);
+    } else if (event.key === 'Enter' && activeIndex >= 0) {
+      event.preventDefault();
+      selectSuggestion(activeIndex);
+    } else if (event.key === 'Escape') {
+      closeSuggestions();
+    }
+  });
+
+  document.addEventListener('click', function (event) {
+    if (!form.contains(event.target)) closeSuggestions();
+  });
+}());
+</script>
+{% endblock %}

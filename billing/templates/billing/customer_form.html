@@ -1,0 +1,48 @@
+{% extends 'billing/base.html' %}
+{% block title %}{% if editing %}Edit customer{% else %}Add customer{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{% if editing %}Edit customer{% else %}Add customer{% endif %}</h1></div>
+</div>
+
+<div class="form-card">
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="field">
+      <label for="{{ form.name.id_for_label }}">Name</label>
+      {{ form.name }}
+      {{ form.name.errors }}
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="{{ form.phone.id_for_label }}">Phone</label>
+        {{ form.phone }}
+      </div>
+      <div class="field">
+        <label for="{{ form.email.id_for_label }}">Email</label>
+        {{ form.email }}
+        {{ form.email.errors }}
+      </div>
+    </div>
+    <div class="field">
+      <label for="{{ form.address.id_for_label }}">Address</label>
+      {{ form.address }}
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="{{ form.state.id_for_label }}">State</label>
+        {{ form.state }}
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px;">Used to work out CGST+SGST vs IGST on bills.</div>
+      </div>
+      <div class="field">
+        <label for="{{ form.gstin.id_for_label }}">GSTIN (optional)</label>
+        {{ form.gstin }}
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">{% if editing %}Save changes{% else %}Add customer{% endif %}</button>
+      <a class="btn ghost" href="{% url 'customer_list' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

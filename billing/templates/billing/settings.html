@@ -1,0 +1,73 @@
+{% extends 'billing/base.html' %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Settings</h1><p>Business profiles and details used on every bill and purchase</p></div>
+</div>
+
+<div class="section profile-section">
+  <div class="section-head"><h2>Business Profiles</h2><a class="btn" href="{% url 'business_profile_add' %}">+ Add New Profile</a></div>
+  <div class="section-body">
+    {% if profiles %}
+    <div class="profile-grid">
+      {% for profile in profiles %}
+      <article class="profile-card {% if profile.is_active %}active{% endif %}">
+        <div class="profile-card-head"><h3>{{ profile.business_name }}</h3>{% if profile.is_active %}<span class="tag paid">ACTIVE</span>{% endif %}</div>
+        {% if profile.owner_name %}<p class="profile-owner">{{ profile.owner_name }}</p>{% endif %}
+        <dl>
+          {% if profile.gstin %}<div><dt>GSTIN</dt><dd>{{ profile.gstin }}</dd></div>{% endif %}
+          {% if profile.state %}<div><dt>State</dt><dd>{{ profile.state }}{% if profile.city %}, {{ profile.city }}{% endif %}</dd></div>{% endif %}
+          {% if profile.phone %}<div><dt>Phone</dt><dd>{{ profile.phone }}</dd></div>{% endif %}
+        </dl>
+        <div class="profile-actions">
+          <a class="icon-btn" href="{% url 'business_profile_edit' profile.pk %}">Edit</a>
+          {% if not profile.is_active %}
+          <form method="post" action="{% url 'business_profile_activate' profile.pk %}">{% csrf_token %}<button class="icon-btn" type="submit">Set as Active</button></form>
+          <form method="post" action="{% url 'business_profile_delete' profile.pk %}" onsubmit="return confirm('Delete this business profile?');">{% csrf_token %}<button class="icon-btn del" type="submit">Delete</button></form>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}<div class="empty-state"><h3>No business profiles yet</h3><p>Add a profile to start using profile-specific business information.</p></div>{% endif %}
+  </div>
+</div>
+
+<div class="form-card">
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="field">
+      <label for="{{ form.business_name.id_for_label }}">Business name</label>
+      {{ form.business_name }}
+      {{ form.business_name.errors }}
+    </div>
+    <div class="field">
+      <label for="{{ form.address.id_for_label }}">Address</label>
+      {{ form.address }}
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="{{ form.state.id_for_label }}">Business state</label>
+        {{ form.state }}
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px;">Compared against each customer/supplier's state to decide CGST+SGST vs IGST.</div>
+      </div>
+      <div class="field">
+        <label for="{{ form.gstin.id_for_label }}">GSTIN</label>
+        {{ form.gstin }}
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="{{ form.currency.id_for_label }}">Currency symbol</label>
+        {{ form.currency }}
+      </div>
+      <div class="field">
+        <label for="{{ form.default_gst_rate.id_for_label }}">Default GST rate (%)</label>
+        {{ form.default_gst_rate }}
+        <div style="font-size:11.5px;color:var(--ink-soft);margin-top:4px;">Used as a starting point for new items — each item's own rate can differ.</div>
+      </div>
+    </div>
+    <button class="btn" type="submit">Save settings</button>
+  </form>
+</div>
+{% endblock %}

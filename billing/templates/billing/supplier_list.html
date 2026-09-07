@@ -1,0 +1,39 @@
+{% extends 'billing/base.html' %}
+{% block title %}Suppliers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Suppliers</h1><p>{{ suppliers.count }} saved</p></div>
+  <div class="head-actions"><a class="btn" href="{% url 'supplier_create' %}">+ Add supplier</a></div>
+</div>
+
+<div class="section">
+  <div class="section-body">
+    <table>
+      <thead><tr><th>Name</th><th>Phone</th><th>State</th><th>GSTIN</th><th class="num">Balance due</th><th></th></tr></thead>
+      <tbody>
+        {% for s in suppliers %}
+        <tr>
+          <td><a href="{% url 'supplier_detail' s.pk %}">{{ s.name }}</a></td>
+          <td class="mono">{{ s.phone|default:"—" }}</td>
+          <td>{{ s.state|default:"—" }}</td>
+          <td class="mono">{{ s.gstin|default:"—" }}</td>
+          <td class="num">
+            {% if s.balance_due > 0 %}<span class="tag low">{{ biz_settings.currency }}{{ s.balance_due|floatformat:2 }}</span>
+            {% else %}<span class="tag ok">Settled</span>{% endif %}
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a class="icon-btn" href="{% url 'supplier_update' s.pk %}">Edit</a>
+            <form method="post" action="{% url 'supplier_delete' s.pk %}" style="display:inline;" onsubmit="return confirm('Delete this supplier?');">
+              {% csrf_token %}
+              <button class="icon-btn del" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="6">No suppliers yet. Add one to start recording purchases.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

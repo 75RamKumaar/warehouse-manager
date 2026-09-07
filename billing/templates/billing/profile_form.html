@@ -1,0 +1,21 @@
+{% extends 'billing/base.html' %}
+{% block title %}{% if profile %}Edit profile{% else %}Add profile{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{% if profile %}Edit profile{% else %}Add new profile{% endif %}</h1><p>Business information used on new bills and purchases</p></div>
+  <a class="btn ghost" href="{% url 'business_settings' %}">Back to settings</a>
+</div>
+<div class="form-card profile-form-card">
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {{ field.errors }}
+      </div>
+    {% endfor %}
+    <div class="form-actions"><button class="btn" type="submit">Save profile</button><a class="btn ghost" href="{% url 'business_settings' %}">Cancel</a></div>
+  </form>
+</div>
+{% endblock %}

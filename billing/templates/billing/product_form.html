@@ -1,0 +1,76 @@
+{% extends 'billing/base.html' %}
+{% block title %}{% if editing %}Edit item{% else %}Add item{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{% if editing %}Edit item{% else %}Add item{% endif %}</h1>
+  <p>{% if editing %}Update details for {{ product.name }}{% else %}Add a new item to inventory{% endif %}</p></div>
+</div>
+
+<div class="form-card">
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="field">
+      <label for="{{ form.name.id_for_label }}">Item name</label>
+      {{ form.name }}
+      {{ form.name.errors }}
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="{{ form.sku.id_for_label }}">SKU / code</label>
+        {{ form.sku }}
+        {{ form.sku.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.category.id_for_label }}">Category</label>
+        {{ form.category }}
+        {{ form.category.errors }}
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="{{ form.unit.id_for_label }}">Unit</label>
+        {{ form.unit }}
+        {{ form.unit.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.hsn_code.id_for_label }}">HSN code</label>
+        {{ form.hsn_code }}
+        {{ form.hsn_code.errors }}
+      </div>
+    </div>
+    <div class="field">
+      <label for="{{ form.gst_rate.id_for_label }}">GST rate (%)</label>
+      {{ form.gst_rate }}
+      {{ form.gst_rate.errors }}
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="{{ form.cost_price.id_for_label }}">Cost price (per unit)</label>
+        {{ form.cost_price }}
+        {{ form.cost_price.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.selling_price.id_for_label }}">Selling price (per unit)</label>
+        {{ form.selling_price }}
+        {{ form.selling_price.errors }}
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="{{ form.quantity.id_for_label }}">Quantity in stock</label>
+        {{ form.quantity }}
+        {{ form.quantity.errors }}
+      </div>
+      <div class="field">
+        <label for="{{ form.reorder_level.id_for_label }}">Reorder level</label>
+        {{ form.reorder_level }}
+        {{ form.reorder_level.errors }}
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">{% if editing %}Save changes{% else %}Add item{% endif %}</button>
+      <a class="btn ghost" href="{% url 'inventory_list' %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

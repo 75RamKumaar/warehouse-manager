@@ -1,0 +1,39 @@
+{% extends 'billing/base.html' %}
+{% block title %}Customers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Customers</h1><p>{{ customers.count }} saved</p></div>
+  <div class="head-actions"><a class="btn" href="{% url 'customer_create' %}">+ Add customer</a></div>
+</div>
+
+<div class="section">
+  <div class="section-body">
+    <table>
+      <thead><tr><th>Name</th><th>Phone</th><th>State</th><th>GSTIN</th><th class="num">Balance due</th><th></th></tr></thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td><a href="{% url 'customer_detail' c.pk %}">{{ c.name }}</a></td>
+          <td class="mono">{{ c.phone|default:"—" }}</td>
+          <td>{{ c.state|default:"—" }}</td>
+          <td class="mono">{{ c.gstin|default:"—" }}</td>
+          <td class="num">
+            {% if c.balance_due > 0 %}<span class="tag low">{{ biz_settings.currency }}{{ c.balance_due|floatformat:2 }}</span>
+            {% else %}<span class="tag ok">Settled</span>{% endif %}
+          </td>
+          <td style="text-align:right;white-space:nowrap;">
+            <a class="icon-btn" href="{% url 'customer_update' c.pk %}">Edit</a>
+            <form method="post" action="{% url 'customer_delete' c.pk %}" style="display:inline;" onsubmit="return confirm('Delete this customer?');">
+              {% csrf_token %}
+              <button class="icon-btn del" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="6">No customers yet. Add one, or leave bills as walk-in sales.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

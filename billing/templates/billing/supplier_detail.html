@@ -1,0 +1,70 @@
+{% extends 'billing/base.html' %}
+{% block title %}{{ supplier.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ supplier.name }}</h1><p>{{ supplier.phone|default:"" }} {% if supplier.state %}· {{ supplier.state }}{% endif %}{% if supplier.gstin %} · GSTIN {{ supplier.gstin }}{% endif %}</p></div>
+  <div class="head-actions"><a class="btn ghost" href="{% url 'supplier_update' supplier.pk %}">Edit supplier</a></div>
+</div>
+
+<div class="stats" style="grid-template-columns:repeat(3,1fr);">
+  <div class="stat"><div class="label">Total purchased</div><div class="value">{{ biz_settings.currency }}{{ supplier.total_purchased|floatformat:2 }}</div></div>
+  <div class="stat"><div class="label">Total paid</div><div class="value good">{{ biz_settings.currency }}{{ supplier.total_paid|floatformat:2 }}</div></div>
+  <div class="stat"><div class="label">Balance due</div><div class="value {% if supplier.balance_due > 0 %}stamp{% else %}good{% endif %}">{{ biz_settings.currency }}{{ supplier.balance_due|floatformat:2 }}</div></div>
+</div>
+
+<div class="bill-grid">
+  <div>
+    <div class="section">
+      <div class="section-head"><h2>Ledger</h2></div>
+      <div class="section-body">
+        <table>
+          <thead><tr><th>Date</th><th>Type</th><th>Ref</th><th class="num">Purchased</th><th class="num">Paid</th><th class="num">Balance</th></tr></thead>
+          <tbody>
+            {% for e in entries %}
+            <tr>
+              <td>{{ e.date|date:"M j, Y" }}</td>
+              <td>{{ e.type }}</td>
+              <td class="mono">{% if e.link %}<a href="{{ e.link.get_absolute_url }}">{{ e.ref }}</a>{% else %}{{ e.ref }}{% endif %}</td>
+              <td class="num">{% if e.debit %}{{ biz_settings.currency }}{{ e.debit|floatformat:2 }}{% else %}—{% endif %}</td>
+              <td class="num">{% if e.credit %}{{ biz_settings.currency }}{{ e.credit|floatformat:2 }}{% else %}—{% endif %}</td>
+              <td class="num">{{ biz_settings.currency }}{{ e.balance|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr class="empty-row"><td colspan="6">No purchases or payments yet for this supplier.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="section">
+      <div class="section-head"><h2>Record a payment</h2></div>
+      <div class="section-body" style="padding-top:14px;">
+        <form method="post">
+          {% csrf_token %}
+          <div class="field">
+            <label for="{{ form.amount.id_for_label }}">Amount paid</label>
+            {{ form.amount }}
+            {{ form.amount.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ form.mode.id_for_label }}">Mode</label>
+            {{ form.mode }}
+          </div>
+          <div class="field">
+            <label for="{{ form.purchase.id_for_label }}">Against purchase</label>
+            {{ form.purchase }}
+          </div>
+          <div class="field">
+            <label for="{{ form.note.id_for_label }}">Note</label>
+            {{ form.note }}
+          </div>
+          <button class="btn" type="submit">Record payment</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
